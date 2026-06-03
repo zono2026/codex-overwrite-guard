@@ -7,7 +7,6 @@
           {
             "type": "command",
             "command": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"%USERPROFILE%\\.codex\\validators\\prevent_source_overwrite.ps1\"",
-            "commandWindows": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"%USERPROFILE%\\.codex\\validators\\prevent_source_overwrite.ps1\"",
             "timeout": 10,
             "statusMessage": "Checking source-file overwrite guard"
           }
