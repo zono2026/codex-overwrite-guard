@@ -84,6 +84,46 @@ tests = [
         },
         'expected': 2,
     },
+    {
+        'name': 'blocks cp without backup destination',
+        'payload': {
+            'tool': 'Bash',
+            'command': r'cp C:\Users\testuser\Documents\new.py C:\Users\testuser\Documents\foo.py'
+        },
+        'expected': 2,
+    },
+    {
+        'name': 'allows cp to backup destination',
+        'payload': {
+            'tool': 'Bash',
+            'command': r'cp C:\Users\testuser\Documents\foo.py C:\Users\testuser\Documents\foo_backup.py'
+        },
+        'expected': 0,
+    },
+    {
+        'name': 'blocks copy-item when source has backup name but destination does not',
+        'payload': {
+            'tool': 'Bash',
+            'command': r'Copy-Item C:\Users\testuser\Documents\foo_backup.csv -Destination C:\Users\testuser\Documents\bar.csv'
+        },
+        'expected': 2,
+    },
+    {
+        'name': 'allows copy-item with -Destination backup name',
+        'payload': {
+            'tool': 'Bash',
+            'command': r'Copy-Item -LiteralPath C:\Users\testuser\Documents\foo.csv -Destination C:\Users\testuser\Documents\foo_backup.csv'
+        },
+        'expected': 0,
+    },
+    {
+        'name': 'allows copy-item with -Dest shorthand backup name',
+        'payload': {
+            'tool': 'Bash',
+            'command': r'Copy-Item -LiteralPath C:\Users\testuser\Documents\foo.csv -Dest C:\Users\testuser\Documents\foo_backup.csv'
+        },
+        'expected': 0,
+    },
 ]
 
 failed = False

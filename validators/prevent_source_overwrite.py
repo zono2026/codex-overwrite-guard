@@ -57,6 +57,29 @@ def is_backup_destination(token):
     return bool(re.search(r'(^|[\\._-])(bak|backup|original|before)([\\._-]|$)', path))
 
 
+def extract_copy_destination(haystack):
+    """Extract the destination path from a copy command.
+    Priority: -Destination/-Dest/-D value > last positional arg.
+    Returns destination token or None (fail closed).
+    """
+    dest_match = re.search(r'-(Destination|Dest|D)\s+(\S+)', haystack, re.IGNORECASE)
+    if dest_match:
+        return dest_match.group(2)
+
+    cmd_match = re.search(r'\b(?:Copy-Item|cpi)\b\s+(.+)', haystack, re.IGNORECASE)
+    if not cmd_match:
+        cmd_match = re.search(r'\b(?:cp|copy)\b\s+(.+)', haystack, re.IGNORECASE)
+    if not cmd_match:
+        return None
+
+    tokens = re.findall(r'\S+', cmd_match.group(1))
+    positionals = [t for t in tokens if not t.startswith('-')]
+    if len(positionals) >= 2:
+        return positionals[-1]
+
+    return None
+
+
 def has_protected_target(text):
     if not text:
         return False
@@ -117,7 +140,7 @@ def main():
     )
 
     copy_shell = re.search(
-        r'\b(Copy-Item)\b',
+        r'\b(Copy-Item|cp|copy|cpi)\b',
         haystack,
         re.IGNORECASE
     )
@@ -133,9 +156,8 @@ def main():
             )
 
     if copy_shell and not destructive_shell:
-        tokens = re.findall(r'\S+', haystack)
-        has_backup_dest = any(is_backup_destination(t) for t in tokens)
-        if not has_backup_dest:
+        dest = extract_copy_destination(haystack)
+        if dest is None or not is_backup_destination(dest):
             if has_protected_target(haystack):
                 reasons.append(
                     "copy command targets a protected file without a backup-named destination."

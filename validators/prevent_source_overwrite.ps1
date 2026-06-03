@@ -97,6 +97,32 @@ function Test-BackupDestination {
     return $path -match "(^|[\\._-])(bak|backup|original|before)([\\._-]|$)"
 }
 
+function Get-CopyDestination {
+    param([string]$Haystack)
+
+    # Priority 1: -Destination / -Dest / -D
+    if ($Haystack -match '(?i)-(Destination|Dest|D)\s+(\S+)') {
+        return $Matches[2]
+    }
+
+    # Priority 2: positional args after copy command
+    $cmdMatch = [regex]::Match($Haystack, '(?i)\b(?:Copy-Item|cpi)\b\s+(.+)')
+    if (-not $cmdMatch.Success) {
+        $cmdMatch = [regex]::Match($Haystack, '(?i)\b(?:cp|copy)\b\s+(.+)')
+    }
+    if (-not $cmdMatch.Success) {
+        return $null
+    }
+
+    $tokens = @($cmdMatch.Groups[1].Value -split '\s+' | Where-Object { $_ })
+    $positionals = @($tokens | Where-Object { -not $_.StartsWith('-') })
+    if ($positionals.Count -ge 2) {
+        return $positionals[$positionals.Count - 1]
+    }
+
+    return $null
+}
+
 function Test-ProtectedTargetMention {
     param([string]$Text)
 
@@ -159,7 +185,7 @@ foreach ($match in $addMatches) {
 $destructivePattern = "(?i)\b(Remove-Item|Move-Item|Set-Content|Out-File|New-Item|rm|del|erase|mv|ri|mi|sc|ni)\b|(?m)(^|[^2])>{1,2}\s*[^&]"
 $hasDestructiveOp = [regex]::IsMatch($haystack, $destructivePattern)
 
-$copyPattern = "(?i)\b(Copy-Item)\b"
+$copyPattern = "(?i)\b(Copy-Item|cp|copy|cpi)\b"
 $hasCopyOp = [regex]::IsMatch($haystack, $copyPattern)
 
 if ($hasDestructiveOp) {
@@ -171,15 +197,8 @@ if ($hasDestructiveOp) {
 }
 
 if ($hasCopyOp -and -not $hasDestructiveOp) {
-    $tokens = $haystack -split '\s+'
-    $hasBackupDest = $false
-    foreach ($token in $tokens) {
-        if (Test-BackupDestination $token) {
-            $hasBackupDest = $true
-            break
-        }
-    }
-    if (-not $hasBackupDest) {
+    $dest = Get-CopyDestination $haystack
+    if ($null -eq $dest -or -not (Test-BackupDestination $dest)) {
         if (Test-ProtectedTargetMention $haystack) {
             $reasons += "copy command targets a protected file without a backup-named destination."
         } else {

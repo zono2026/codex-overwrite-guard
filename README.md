@@ -36,6 +36,8 @@ Agent: "The direct overwrite was blocked by the source-file guard.
 | Delete + re-add same file | `*** Delete File: foo.csv` then `*** Add File: foo.csv` | Blocked |
 | Move/replace via patch | `*** Move to: foo.csv` | Blocked |
 | `Remove-Item`, `rm`, `del` on a user file | `Remove-Item Documents\foo.csv` | Blocked |
+| `cp`, `copy`, `cpi` without backup destination | `cp foo.py bar.py` | Blocked |
+| Copy where source has backup name but dest does not | `Copy-Item foo_backup.csv -Destination bar.csv` | Blocked |
 | Destructive shell op with unresolvable target | `Remove-Item $target` | Blocked (fail-closed) |
 | Redirect overwrite on a protected path | `... > Documents\foo.csv` | Blocked |
 
@@ -44,8 +46,8 @@ Agent: "The direct overwrite was blocked by the source-file guard.
 | Operation | Example | Result |
 |---|---|---|
 | In-place edit via patch | `*** Update File: foo.csv` | Allowed |
-| Backup copy with `.bak` suffix | `Copy-Item foo.csv foo.csv.bak_before_edit -Force` | Allowed |
-| Operations in `.codex\`, `temp\`, `tmp\` | any path under those dirs | Allowed |
+| Backup copy with `.bak` suffix | `Copy-Item foo.csv -Destination foo.csv.bak_before_edit` | Allowed |
+| `apply_patch` on exempt paths (`.codex\`, `tmp\`) | `*** Update File: .codex/config.json` | Allowed |
 
 ## Requirements
 
@@ -141,7 +143,9 @@ New-Item -ItemType Directory -Force "$env:USERPROFILE\.claude\validators"
 Copy-Item validators\prevent_source_overwrite.py "$env:USERPROFILE\.claude\validators\"
 ```
 
-2. Add the hook to `~/.claude/settings.json`. See [`claude-code/settings.json.example`](claude-code/settings.json.example) for a ready-to-use template.
+2. Add the hook to `~/.claude/settings.json`. See [`claude-code/settings.json.example`](claude-code/settings.json.example) for ready-to-use templates.
+
+**macOS / Linux:**
 
 ```json
 {
@@ -152,8 +156,28 @@ Copy-Item validators\prevent_source_overwrite.py "$env:USERPROFILE\.claude\valid
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ~/.claude/validators/prevent_source_overwrite.py",
-            "commandWindows": "python \"%USERPROFILE%\\.claude\\validators\\prevent_source_overwrite.py\""
+            "command": "python3 ~/.claude/validators/prevent_source_overwrite.py"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Windows:**
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$env:USERPROFILE\\.claude\\validators\\prevent_source_overwrite.py\"",
+            "shell": "powershell"
           }
         ]
       }
@@ -185,6 +209,15 @@ PASS allows apply_patch update: exit 0
 PASS blocks remove item against document: exit 2
 PASS blocks remove item without inspectable target: exit 2
 PASS allows same-folder backup copy: exit 0
+PASS blocks copy-item overwrite without backup name: exit 2
+PASS allows copy-item to backup name without force: exit 0
+PASS blocks rm even when backup keyword appears in text: exit 2
+PASS blocks ri alias against document: exit 2
+PASS blocks cp without backup destination: exit 2
+PASS allows cp to backup destination: exit 0
+PASS blocks copy-item when source has backup name but destination does not: exit 2
+PASS allows copy-item with -Destination backup name: exit 0
+PASS allows copy-item with -Dest shorthand backup name: exit 0
 ```
 
 ## How it works
@@ -194,7 +227,7 @@ The agent platform (Codex or Claude Code) calls this script as a PreToolUse hook
 1. Parses the JSON and flattens all string values into a single text block
 2. Scans for dangerous `apply_patch` markers (`*** Delete File:`, `*** Move to:`)
 3. Scans for destructive shell operations (`Remove-Item`, `rm`, `>`, PowerShell aliases `ri`/`mi`/`sc`/`ni`, etc.) — always blocked against protected targets
-4. Scans for copy operations (`Copy-Item`) — allowed only if the destination path contains a backup name (`.bak`, `_backup`, `_before`, `_original`)
+4. Scans for copy operations (`Copy-Item`, `cp`, `copy`, `cpi`) — extracts the destination path (via `-Destination`/`-Dest`/`-D` or last positional arg) and allows only if it contains a backup name (`.bak`, `_backup`, `_before`, `_original`)
 5. Exits with code `2` to block, `0` to allow
 6. When in doubt, exits `2` (fail-closed)
 

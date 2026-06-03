@@ -79,6 +79,46 @@ $tests = @(
             command = "ri C:\Users\testuser\Documents\foo.csv"
         }
         ExpectedExitCode = 2
+    },
+    @{
+        Name = "blocks cp without backup destination"
+        Payload = @{
+            tool = "Bash"
+            command = "cp C:\Users\testuser\Documents\new.py C:\Users\testuser\Documents\foo.py"
+        }
+        ExpectedExitCode = 2
+    },
+    @{
+        Name = "allows cp to backup destination"
+        Payload = @{
+            tool = "Bash"
+            command = "cp C:\Users\testuser\Documents\foo.py C:\Users\testuser\Documents\foo_backup.py"
+        }
+        ExpectedExitCode = 0
+    },
+    @{
+        Name = "blocks copy-item when source has backup name but destination does not"
+        Payload = @{
+            tool = "Bash"
+            command = "Copy-Item C:\Users\testuser\Documents\foo_backup.csv -Destination C:\Users\testuser\Documents\bar.csv"
+        }
+        ExpectedExitCode = 2
+    },
+    @{
+        Name = "allows copy-item with -Destination backup name"
+        Payload = @{
+            tool = "Bash"
+            command = "Copy-Item -LiteralPath C:\Users\testuser\Documents\foo.csv -Destination C:\Users\testuser\Documents\foo_backup.csv"
+        }
+        ExpectedExitCode = 0
+    },
+    @{
+        Name = "allows copy-item with -Dest shorthand backup name"
+        Payload = @{
+            tool = "Bash"
+            command = "Copy-Item -LiteralPath C:\Users\testuser\Documents\foo.csv -Dest C:\Users\testuser\Documents\foo_backup.csv"
+        }
+        ExpectedExitCode = 0
     }
 )
 
