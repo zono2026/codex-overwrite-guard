@@ -128,6 +128,22 @@ $tests = @(
             command = "Copy-Item -LiteralPath C:\Users\testuser\Documents\foo.csv -Destination C:\Users\testuser\Documents\bar.csv"
         }
         ExpectedExitCode = 2
+    },
+    @{
+        Name = "blocks stderr redirect to file"
+        Payload = @{
+            tool = "Bash"
+            command = "somecmd 2> C:\Users\testuser\Documents\error.log"
+        }
+        ExpectedExitCode = 2
+    },
+    @{
+        Name = "allows stderr merge to stdout"
+        Payload = @{
+            tool = "Bash"
+            command = "somecmd 2>&1 | grep pattern"
+        }
+        ExpectedExitCode = 0
     }
 )
 

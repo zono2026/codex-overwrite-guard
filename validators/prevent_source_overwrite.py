@@ -126,9 +126,11 @@ def main():
         sys.exit(2)
 
     texts = [raw]
+    json_parsed = False
     command_text = None
     try:
         data = json.loads(raw)
+        json_parsed = True
         collect_texts(data, texts)
         command_text = extract_command_text(data)
     except Exception:
@@ -136,8 +138,15 @@ def main():
 
     haystack = '\n'.join(texts)
     # For copy destination extraction, use only the actual command string.
-    # Fall back to haystack only if JSON parse failed (command_text is None).
-    copy_source = command_text if command_text is not None else haystack
+    # If JSON parsed successfully but command field not found, use empty string
+    # (fail closed) — never fall back to haystack which includes non-command fields.
+    # Fall back to haystack only if JSON parse itself failed (raw text input).
+    if command_text is not None:
+        copy_source = command_text
+    elif json_parsed:
+        copy_source = ""
+    else:
+        copy_source = haystack
     reasons = []
 
     delete_paths = set()
@@ -161,7 +170,7 @@ def main():
 
     destructive_shell = re.search(
         r'\b(Remove-Item|Move-Item|Set-Content|Out-File|New-Item|rm|del|erase|mv|ri|mi|sc|ni)\b'
-        r'|(^|[^2])>{1,2}\s*[^&]',
+        r'|>{1,2}\s*(?!&)\S',
         haystack,
         re.IGNORECASE | re.MULTILINE
     )

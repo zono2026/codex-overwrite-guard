@@ -166,9 +166,11 @@ function Get-CommandText {
 }
 
 $texts = @($raw)
+$jsonParsed = $false
 $commandText = $null
 try {
     $json = $raw | ConvertFrom-Json
+    $jsonParsed = $true
     Add-TextFromValue -Value $json -Texts ([ref]$texts)
     $commandText = Get-CommandText $json
 } catch {
@@ -177,8 +179,16 @@ try {
 
 $haystack = $texts -join "`n"
 # For copy destination extraction, use only the actual command string.
-# Fall back to haystack only if JSON parse failed (commandText is null).
-$copySource = if ($null -ne $commandText) { $commandText } else { $haystack }
+# If JSON parsed successfully but command field not found, use empty string
+# (fail closed) — never fall back to haystack which includes non-command fields.
+# Fall back to haystack only if JSON parse itself failed (raw text input).
+if ($null -ne $commandText) {
+    $copySource = $commandText
+} elseif ($jsonParsed) {
+    $copySource = ""
+} else {
+    $copySource = $haystack
+}
 $reasons = @()
 
 $deleteMatches = [regex]::Matches($haystack, "(?m)^\*\*\* Delete File:\s*(.+?)\s*$")
@@ -210,7 +220,7 @@ foreach ($match in $addMatches) {
     }
 }
 
-$destructivePattern = "(?i)\b(Remove-Item|Move-Item|Set-Content|Out-File|New-Item|rm|del|erase|mv|ri|mi|sc|ni)\b|(?m)(^|[^2])>{1,2}\s*[^&]"
+$destructivePattern = "(?i)\b(Remove-Item|Move-Item|Set-Content|Out-File|New-Item|rm|del|erase|mv|ri|mi|sc|ni)\b|>{1,2}\s*(?!&)\S"
 $hasDestructiveOp = [regex]::IsMatch($haystack, $destructivePattern)
 
 $copyPattern = "(?i)\b(Copy-Item|cp|copy|cpi)\b"

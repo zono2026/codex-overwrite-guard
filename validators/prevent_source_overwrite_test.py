@@ -133,6 +133,22 @@ tests = [
         },
         'expected': 2,
     },
+    {
+        'name': 'blocks stderr redirect to file',
+        'payload': {
+            'tool': 'Bash',
+            'command': r'somecmd 2> C:\Users\testuser\Documents\error.log'
+        },
+        'expected': 2,
+    },
+    {
+        'name': 'allows stderr merge to stdout',
+        'payload': {
+            'tool': 'Bash',
+            'command': 'somecmd 2>&1 | grep pattern'
+        },
+        'expected': 0,
+    },
 ]
 
 failed = False

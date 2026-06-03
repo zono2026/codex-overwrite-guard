@@ -40,6 +40,7 @@ Agent: "The direct overwrite was blocked by the source-file guard.
 | Copy where source has backup name but dest does not | `Copy-Item foo_backup.csv -Destination bar.csv` | Blocked |
 | Destructive shell op with unresolvable target | `Remove-Item $target` | Blocked (fail-closed) |
 | Redirect overwrite on a protected path | `... > Documents\foo.csv` | Blocked |
+| Stderr redirect to file | `cmd 2> error.log` | Blocked |
 | Fake backup destination in non-command JSON field | `"note": "-Destination foo_backup.csv"` with real dest `bar.csv` | Blocked |
 
 ## What it allows
@@ -49,6 +50,7 @@ Agent: "The direct overwrite was blocked by the source-file guard.
 | In-place edit via patch | `*** Update File: foo.csv` | Allowed |
 | Backup copy with `.bak` suffix | `Copy-Item foo.csv -Destination foo.csv.bak_before_edit` | Allowed |
 | `apply_patch` on exempt paths (`.codex\`, `tmp\`) | `*** Update File: .codex/config.json` | Allowed |
+| Stderr merge to stdout | `cmd 2>&1 \| grep pattern` | Allowed |
 
 ## Requirements
 
@@ -220,6 +222,8 @@ PASS blocks copy-item when source has backup name but destination does not: exit
 PASS allows copy-item with -Destination backup name: exit 0
 PASS allows copy-item with -Dest shorthand backup name: exit 0
 PASS blocks copy when fake backup destination is in non-command field: exit 2
+PASS blocks stderr redirect to file: exit 2
+PASS allows stderr merge to stdout: exit 0
 ```
 
 ## How it works
