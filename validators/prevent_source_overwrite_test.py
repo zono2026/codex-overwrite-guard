@@ -68,6 +68,22 @@ tests = [
         },
         'expected': 0,
     },
+    {
+        'name': 'blocks rm even when backup keyword appears in text',
+        'payload': {
+            'tool': 'Bash',
+            'command': r"echo 'creating backup' ; rm C:\Users\testuser\Documents\foo.csv"
+        },
+        'expected': 2,
+    },
+    {
+        'name': 'blocks ri alias against document',
+        'payload': {
+            'tool': 'Bash',
+            'command': r'ri C:\Users\testuser\Documents\foo.csv'
+        },
+        'expected': 2,
+    },
 ]
 
 failed = False

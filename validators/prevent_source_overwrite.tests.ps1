@@ -63,6 +63,22 @@ $tests = @(
             command = "Copy-Item -LiteralPath C:\Users\testuser\Documents\foo.csv -Destination C:\Users\testuser\Documents\foo_backup.csv"
         }
         ExpectedExitCode = 0
+    },
+    @{
+        Name = "blocks rm even when backup keyword appears in text"
+        Payload = @{
+            tool = "Bash"
+            command = "echo 'creating backup' ; rm C:\Users\testuser\Documents\foo.csv"
+        }
+        ExpectedExitCode = 2
+    },
+    @{
+        Name = "blocks ri alias against document"
+        Payload = @{
+            tool = "Bash"
+            command = "ri C:\Users\testuser\Documents\foo.csv"
+        }
+        ExpectedExitCode = 2
     }
 )
 

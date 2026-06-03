@@ -193,8 +193,8 @@ The agent platform (Codex or Claude Code) calls this script as a PreToolUse hook
 
 1. Parses the JSON and flattens all string values into a single text block
 2. Scans for dangerous `apply_patch` markers (`*** Delete File:`, `*** Move to:`)
-3. Scans for destructive shell operations (`Remove-Item`, `rm`, `>`, etc.)
-4. Checks for backup intent keywords (`.bak`, `backup`, `before`, `original`)
+3. Scans for destructive shell operations (`Remove-Item`, `rm`, `>`, PowerShell aliases `ri`/`mi`/`sc`/`ni`, etc.) — always blocked against protected targets
+4. Scans for copy operations (`Copy-Item`) — allowed only if the destination path contains a backup name (`.bak`, `_backup`, `_before`, `_original`)
 5. Exits with code `2` to block, `0` to allow
 6. When in doubt, exits `2` (fail-closed)
 
@@ -203,6 +203,7 @@ The agent platform (Codex or Claude Code) calls this script as a PreToolUse hook
 - The `matcher` field must cover all tool names the agent uses for file I/O. If a new tool name is introduced in a future version, update the hook config accordingly.
 - Hook payload format is based on Codex v0.136.0 and Claude Code as of June 2025. If the JSON structure changes in a future version, the script may need updating.
 - The PowerShell version is Windows only. Use the Python version for macOS and Linux.
+- PowerShell aliases (`ri`, `mi`, `sc`, `ni`) are blocked conservatively. `sc` may conflict with Windows `sc.exe` (service control) but the guard errs on the side of caution.
 
 ## License
 

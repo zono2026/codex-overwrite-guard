@@ -48,6 +48,15 @@ def is_exempt_path(text):
     )
 
 
+def is_backup_destination(token):
+    path = normalize_path(token)
+    if not path:
+        return False
+    if '\\' not in path and '.' not in path:
+        return False
+    return bool(re.search(r'(^|[\\._-])(bak|backup|original|before)([\\._-]|$)', path))
+
+
 def has_protected_target(text):
     if not text:
         return False
@@ -100,24 +109,41 @@ def main():
                 f"apply_patch attempted to replace a file by deleting and re-adding it: {m.group(1)}"
             )
 
-    risky_shell = re.search(
-        r'\b(Remove-Item|Move-Item|Set-Content|Out-File|Copy-Item|rm|del|erase|mv)\b'
+    destructive_shell = re.search(
+        r'\b(Remove-Item|Move-Item|Set-Content|Out-File|New-Item|rm|del|erase|mv|ri|mi|sc|ni)\b'
         r'|(^|[^2])>{1,2}\s*[^&]',
         haystack,
         re.IGNORECASE | re.MULTILINE
     )
-    has_backup = re.search(r'(?i)(\.bak\b|backup|before|original)', haystack)
 
-    if risky_shell and not has_backup:
+    copy_shell = re.search(
+        r'\b(Copy-Item)\b',
+        haystack,
+        re.IGNORECASE
+    )
+
+    if destructive_shell:
         if has_protected_target(haystack):
             reasons.append(
-                "shell command looked like it could overwrite, delete, move, or replace "
-                "a protected source file without an obvious backup."
+                "shell command contains a destructive operation targeting a protected source file."
             )
         else:
             reasons.append(
-                "shell command uses file mutation syntax, but the target could not be inspected; failing closed."
+                "shell command uses destructive syntax, but the target could not be inspected; failing closed."
             )
+
+    if copy_shell and not destructive_shell:
+        tokens = re.findall(r'\S+', haystack)
+        has_backup_dest = any(is_backup_destination(t) for t in tokens)
+        if not has_backup_dest:
+            if has_protected_target(haystack):
+                reasons.append(
+                    "copy command targets a protected file without a backup-named destination."
+                )
+            else:
+                reasons.append(
+                    "copy command target could not be inspected; failing closed."
+                )
 
     if reasons:
         sys.stderr.write("Source overwrite guard blocked this tool call.\n")

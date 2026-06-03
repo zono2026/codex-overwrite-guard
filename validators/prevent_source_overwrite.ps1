@@ -84,6 +84,19 @@ function Test-ExemptPath {
     )
 }
 
+function Test-BackupDestination {
+    param([string]$Token)
+
+    $path = Normalize-PathText $Token
+    if ([string]::IsNullOrWhiteSpace($path)) {
+        return $false
+    }
+    if ($path -notmatch "\\" -and $path -notmatch "\.") {
+        return $false
+    }
+    return $path -match "(^|[\\._-])(bak|backup|original|before)([\\._-]|$)"
+}
+
 function Test-ProtectedTargetMention {
     param([string]$Text)
 
@@ -143,15 +156,35 @@ foreach ($match in $addMatches) {
     }
 }
 
-$riskyShellPattern = "(?i)\b(Remove-Item|Move-Item|Set-Content|Out-File|Copy-Item|rm|del|erase|mv)\b|(?m)(^|[^2])>{1,2}\s*[^&]"
-$hasRiskyShellOperation = [regex]::IsMatch($haystack, $riskyShellPattern)
-$hasBackupIntent = [regex]::IsMatch($haystack, "(?i)(\.bak\b|backup|before|original)")
+$destructivePattern = "(?i)\b(Remove-Item|Move-Item|Set-Content|Out-File|New-Item|rm|del|erase|mv|ri|mi|sc|ni)\b|(?m)(^|[^2])>{1,2}\s*[^&]"
+$hasDestructiveOp = [regex]::IsMatch($haystack, $destructivePattern)
 
-if ($hasRiskyShellOperation -and -not $hasBackupIntent) {
+$copyPattern = "(?i)\b(Copy-Item)\b"
+$hasCopyOp = [regex]::IsMatch($haystack, $copyPattern)
+
+if ($hasDestructiveOp) {
     if (Test-ProtectedTargetMention $haystack) {
-        $reasons += "shell command looked like it could overwrite, delete, move, or replace a protected source file without an obvious backup."
+        $reasons += "shell command contains a destructive operation targeting a protected source file."
     } else {
-        $reasons += "shell command uses file mutation syntax, but the target could not be inspected; failing closed."
+        $reasons += "shell command uses destructive syntax, but the target could not be inspected; failing closed."
+    }
+}
+
+if ($hasCopyOp -and -not $hasDestructiveOp) {
+    $tokens = $haystack -split '\s+'
+    $hasBackupDest = $false
+    foreach ($token in $tokens) {
+        if (Test-BackupDestination $token) {
+            $hasBackupDest = $true
+            break
+        }
+    }
+    if (-not $hasBackupDest) {
+        if (Test-ProtectedTargetMention $haystack) {
+            $reasons += "copy command targets a protected file without a backup-named destination."
+        } else {
+            $reasons += "copy command target could not be inspected; failing closed."
+        }
     }
 }
 
