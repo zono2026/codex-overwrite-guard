@@ -28,7 +28,7 @@ $tests = @(
         Name = "blocks remove item against document"
         Payload = @{
             tool = "Bash"
-            command = "Remove-Item -LiteralPath C:\Users\OSKCLT4740\Documents\foo.csv"
+            command = "Remove-Item -LiteralPath C:\Users\testuser\Documents\foo.csv"
         }
         ExpectedExitCode = 2
     },
@@ -44,7 +44,7 @@ $tests = @(
         Name = "allows same-folder backup copy"
         Payload = @{
             tool = "Bash"
-            command = "Copy-Item -LiteralPath C:\Users\OSKCLT4740\Documents\foo.csv -Destination C:\Users\OSKCLT4740\Documents\foo.csv.bak_before_edit -Force"
+            command = "Copy-Item -LiteralPath C:\Users\testuser\Documents\foo.csv -Destination C:\Users\testuser\Documents\foo.csv.bak_before_edit -Force"
         }
         ExpectedExitCode = 0
     },
@@ -52,7 +52,7 @@ $tests = @(
         Name = "blocks copy-item overwrite without backup name"
         Payload = @{
             tool = "Bash"
-            command = "Copy-Item -LiteralPath C:\Users\OSKCLT4740\Documents\foo.csv -Destination C:\Users\OSKCLT4740\Documents\bar.csv"
+            command = "Copy-Item -LiteralPath C:\Users\testuser\Documents\foo.csv -Destination C:\Users\testuser\Documents\bar.csv"
         }
         ExpectedExitCode = 2
     },
@@ -60,7 +60,7 @@ $tests = @(
         Name = "allows copy-item to backup name without force"
         Payload = @{
             tool = "Bash"
-            command = "Copy-Item -LiteralPath C:\Users\OSKCLT4740\Documents\foo.csv -Destination C:\Users\OSKCLT4740\Documents\foo_backup.csv"
+            command = "Copy-Item -LiteralPath C:\Users\testuser\Documents\foo.csv -Destination C:\Users\testuser\Documents\foo_backup.csv"
         }
         ExpectedExitCode = 0
     }

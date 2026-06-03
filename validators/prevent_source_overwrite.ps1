@@ -98,7 +98,7 @@ function Test-ProtectedTargetMention {
     }
 
     return (
-        $normalized -match "\\users\\oskclt4740\\(documents|desktop|downloads|onedrive)\\" -or
+        $normalized -match "\\users\\[^\\]+\\(documents|desktop|downloads|onedrive)\\" -or
         $normalized -match "\.(csv|tsv|xlsx|xls|xlsm|docx|doc|pdf|txt|md|json|toml|yaml|yml|ps1|py|js|ts|tsx|jsx|html|css|sql)(\s|`"|`'|$)"
     )
 }
