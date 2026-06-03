@@ -142,15 +142,43 @@ function Test-ProtectedTargetMention {
     )
 }
 
+function Get-CommandText {
+    param($Data)
+
+    if ($null -eq $Data) { return $null }
+
+    # Direct 'command' field (Bash tool)
+    if ($Data.PSObject.Properties['command'] -and $Data.command -is [string]) {
+        return $Data.command
+    }
+    # 'input' field (apply_patch, etc.)
+    if ($Data.PSObject.Properties['input'] -and $Data.input -is [string]) {
+        return $Data.input
+    }
+    # Nested tool_input.command
+    if ($Data.PSObject.Properties['tool_input'] -and $null -ne $Data.tool_input) {
+        $ti = $Data.tool_input
+        if ($ti.PSObject.Properties['command'] -and $ti.command -is [string]) {
+            return $ti.command
+        }
+    }
+    return $null
+}
+
 $texts = @($raw)
+$commandText = $null
 try {
     $json = $raw | ConvertFrom-Json
     Add-TextFromValue -Value $json -Texts ([ref]$texts)
+    $commandText = Get-CommandText $json
 } catch {
     # Hooks should be conservative but not fail just because Codex changes JSON shape.
 }
 
 $haystack = $texts -join "`n"
+# For copy destination extraction, use only the actual command string.
+# Fall back to haystack only if JSON parse failed (commandText is null).
+$copySource = if ($null -ne $commandText) { $commandText } else { $haystack }
 $reasons = @()
 
 $deleteMatches = [regex]::Matches($haystack, "(?m)^\*\*\* Delete File:\s*(.+?)\s*$")
@@ -197,7 +225,7 @@ if ($hasDestructiveOp) {
 }
 
 if ($hasCopyOp -and -not $hasDestructiveOp) {
-    $dest = Get-CopyDestination $haystack
+    $dest = Get-CopyDestination $copySource
     if ($null -eq $dest -or -not (Test-BackupDestination $dest)) {
         if (Test-ProtectedTargetMention $haystack) {
             $reasons += "copy command targets a protected file without a backup-named destination."

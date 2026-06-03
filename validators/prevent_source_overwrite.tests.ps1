@@ -119,6 +119,15 @@ $tests = @(
             command = "Copy-Item -LiteralPath C:\Users\testuser\Documents\foo.csv -Dest C:\Users\testuser\Documents\foo_backup.csv"
         }
         ExpectedExitCode = 0
+    },
+    @{
+        Name = "blocks copy when fake backup destination is in non-command field"
+        Payload = @{
+            tool = "Bash"
+            note = "pretend -Destination C:\Users\testuser\Documents\foo_backup.csv"
+            command = "Copy-Item -LiteralPath C:\Users\testuser\Documents\foo.csv -Destination C:\Users\testuser\Documents\bar.csv"
+        }
+        ExpectedExitCode = 2
     }
 )
 

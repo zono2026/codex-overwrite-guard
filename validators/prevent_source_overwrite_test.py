@@ -124,6 +124,15 @@ tests = [
         },
         'expected': 0,
     },
+    {
+        'name': 'blocks copy when fake backup destination is in non-command field',
+        'payload': {
+            'tool': 'Bash',
+            'note': r'pretend -Destination C:\Users\testuser\Documents\foo_backup.csv',
+            'command': r'Copy-Item -LiteralPath C:\Users\testuser\Documents\foo.csv -Destination C:\Users\testuser\Documents\bar.csv'
+        },
+        'expected': 2,
+    },
 ]
 
 failed = False

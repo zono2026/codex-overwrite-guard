@@ -95,6 +95,28 @@ def has_protected_target(text):
     )
 
 
+def extract_command_text(data):
+    """Extract the actual command string from parsed JSON.
+    Looks for 'command', 'input', or nested 'tool_input.command'.
+    Returns the command string, or None if not found.
+    """
+    if not isinstance(data, dict):
+        return None
+    # Direct 'command' field (Bash tool)
+    if 'command' in data and isinstance(data['command'], str):
+        return data['command']
+    # 'input' field (apply_patch, etc.)
+    if 'input' in data and isinstance(data['input'], str):
+        return data['input']
+    # Nested tool_input.command
+    tool_input = data.get('tool_input')
+    if isinstance(tool_input, dict):
+        cmd = tool_input.get('command')
+        if isinstance(cmd, str):
+            return cmd
+    return None
+
+
 def main():
     raw = sys.stdin.read().strip()
 
@@ -104,13 +126,18 @@ def main():
         sys.exit(2)
 
     texts = [raw]
+    command_text = None
     try:
         data = json.loads(raw)
         collect_texts(data, texts)
+        command_text = extract_command_text(data)
     except Exception:
         pass
 
     haystack = '\n'.join(texts)
+    # For copy destination extraction, use only the actual command string.
+    # Fall back to haystack only if JSON parse failed (command_text is None).
+    copy_source = command_text if command_text is not None else haystack
     reasons = []
 
     delete_paths = set()
@@ -156,7 +183,7 @@ def main():
             )
 
     if copy_shell and not destructive_shell:
-        dest = extract_copy_destination(haystack)
+        dest = extract_copy_destination(copy_source)
         if dest is None or not is_backup_destination(dest):
             if has_protected_target(haystack):
                 reasons.append(

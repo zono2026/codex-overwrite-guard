@@ -40,6 +40,7 @@ Agent: "The direct overwrite was blocked by the source-file guard.
 | Copy where source has backup name but dest does not | `Copy-Item foo_backup.csv -Destination bar.csv` | Blocked |
 | Destructive shell op with unresolvable target | `Remove-Item $target` | Blocked (fail-closed) |
 | Redirect overwrite on a protected path | `... > Documents\foo.csv` | Blocked |
+| Fake backup destination in non-command JSON field | `"note": "-Destination foo_backup.csv"` with real dest `bar.csv` | Blocked |
 
 ## What it allows
 
@@ -143,7 +144,7 @@ New-Item -ItemType Directory -Force "$env:USERPROFILE\.claude\validators"
 Copy-Item validators\prevent_source_overwrite.py "$env:USERPROFILE\.claude\validators\"
 ```
 
-2. Add the hook to `~/.claude/settings.json`. See [`claude-code/settings.json.example`](claude-code/settings.json.example) for ready-to-use templates.
+2. Add the hook to `~/.claude/settings.json`. See [`claude-code/settings.json.example`](claude-code/settings.json.example) and copy the appropriate block for your OS.
 
 **macOS / Linux:**
 
@@ -218,6 +219,7 @@ PASS allows cp to backup destination: exit 0
 PASS blocks copy-item when source has backup name but destination does not: exit 2
 PASS allows copy-item with -Destination backup name: exit 0
 PASS allows copy-item with -Dest shorthand backup name: exit 0
+PASS blocks copy when fake backup destination is in non-command field: exit 2
 ```
 
 ## How it works
