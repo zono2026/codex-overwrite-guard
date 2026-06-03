@@ -97,30 +97,42 @@ function Test-BackupDestination {
     return $path -match "(^|[\\._-])(bak|backup|original|before)([\\._-]|$)"
 }
 
-function Get-CopyDestination {
-    param([string]$Haystack)
+function Get-AllCopyDestinations {
+    param([string]$Text)
 
-    # Priority 1: -Destination / -Dest / -D
-    if ($Haystack -match '(?i)-(Destination|Dest|D)\s+(\S+)') {
-        return $Matches[2]
+    $destinations = @()
+    if ([string]::IsNullOrWhiteSpace($Text)) {
+        return $destinations
     }
 
-    # Priority 2: positional args after copy command
-    $cmdMatch = [regex]::Match($Haystack, '(?i)\b(?:Copy-Item|cpi)\b\s+(.+)')
-    if (-not $cmdMatch.Success) {
-        $cmdMatch = [regex]::Match($Haystack, '(?i)\b(?:cp|copy)\b\s+(.+)')
-    }
-    if (-not $cmdMatch.Success) {
-        return $null
+    # Find all copy commands, scoped to their segment (delimited by ; | & newline).
+    # Copy-Item/cpi are tried first (via alternation order) to prevent
+    # 'copy' from matching inside 'Copy-Item'.
+    $copyPattern = [regex]::new('(?i)\b(?:Copy-Item|cpi)\b\s*([^;|&\n]*)|\b(?:cp|copy)\b\s*([^;|&\n]*)')
+    $copyMatches = $copyPattern.Matches($Text)
+
+    foreach ($m in $copyMatches) {
+        if ($m.Groups[1].Success) {
+            $args = $m.Groups[1].Value
+        } else {
+            $args = $m.Groups[2].Value
+        }
+
+        if ($args -match '(?i)-(Destination|Dest|D)\s+(\S+)') {
+            $destinations += $Matches[2]
+            continue
+        }
+
+        $tokens = @($args -split '\s+' | Where-Object { $_ })
+        $positionals = @($tokens | Where-Object { -not $_.StartsWith('-') })
+        if ($positionals.Count -ge 2) {
+            $destinations += $positionals[$positionals.Count - 1]
+        } else {
+            $destinations += $null
+        }
     }
 
-    $tokens = @($cmdMatch.Groups[1].Value -split '\s+' | Where-Object { $_ })
-    $positionals = @($tokens | Where-Object { -not $_.StartsWith('-') })
-    if ($positionals.Count -ge 2) {
-        return $positionals[$positionals.Count - 1]
-    }
-
-    return $null
+    return $destinations
 }
 
 function Test-ProtectedTargetMention {
@@ -142,27 +154,32 @@ function Test-ProtectedTargetMention {
     )
 }
 
-function Get-CommandText {
+function Get-AllCommandTexts {
     param($Data)
 
-    if ($null -eq $Data) { return $null }
+    if ($null -eq $Data) { return @() }
 
+    $results = @()
     # Direct 'command' field (Bash tool)
     if ($Data.PSObject.Properties['command'] -and $Data.command -is [string]) {
-        return $Data.command
-    }
-    # 'input' field (apply_patch, etc.)
-    if ($Data.PSObject.Properties['input'] -and $Data.input -is [string]) {
-        return $Data.input
+        $results += $Data.command
     }
     # Nested tool_input.command
     if ($Data.PSObject.Properties['tool_input'] -and $null -ne $Data.tool_input) {
         $ti = $Data.tool_input
         if ($ti.PSObject.Properties['command'] -and $ti.command -is [string]) {
-            return $ti.command
+            if ($results -notcontains $ti.command) {
+                $results += $ti.command
+            }
         }
     }
-    return $null
+    # 'input' field (apply_patch, etc.) — lowest priority
+    if ($Data.PSObject.Properties['input'] -and $Data.input -is [string]) {
+        if ($results -notcontains $Data.input) {
+            $results += $Data.input
+        }
+    }
+    return $results
 }
 
 $texts = @($raw)
@@ -172,22 +189,21 @@ try {
     $json = $raw | ConvertFrom-Json
     $jsonParsed = $true
     Add-TextFromValue -Value $json -Texts ([ref]$texts)
-    $commandText = Get-CommandText $json
+    $commandTexts = @(Get-AllCommandTexts $json)
 } catch {
     # Hooks should be conservative but not fail just because Codex changes JSON shape.
 }
 
 $haystack = $texts -join "`n"
-# For copy destination extraction, use only the actual command string.
-# If JSON parsed successfully but command field not found, use empty string
-# (fail closed) — never fall back to haystack which includes non-command fields.
+# For copy destination extraction, use only actual command strings.
+# If JSON parsed but no command fields found, use empty string (fail closed).
 # Fall back to haystack only if JSON parse itself failed (raw text input).
-if ($null -ne $commandText) {
-    $copySource = $commandText
+if ($commandTexts.Count -gt 0) {
+    $copySources = $commandTexts
 } elseif ($jsonParsed) {
-    $copySource = ""
+    $copySources = @("")
 } else {
-    $copySource = $haystack
+    $copySources = @($haystack)
 }
 $reasons = @()
 
@@ -235,8 +251,24 @@ if ($hasDestructiveOp) {
 }
 
 if ($hasCopyOp -and -not $hasDestructiveOp) {
-    $dest = Get-CopyDestination $copySource
-    if ($null -eq $dest -or -not (Test-BackupDestination $dest)) {
+    $allDests = @()
+    foreach ($src in $copySources) {
+        $allDests += @(Get-AllCopyDestinations $src)
+    }
+
+    $blocked = $false
+    if ($allDests.Count -eq 0) {
+        $blocked = $true
+    } else {
+        foreach ($dest in $allDests) {
+            if ($null -eq $dest -or -not (Test-BackupDestination $dest)) {
+                $blocked = $true
+                break
+            }
+        }
+    }
+
+    if ($blocked) {
         if (Test-ProtectedTargetMention $haystack) {
             $reasons += "copy command targets a protected file without a backup-named destination."
         } else {

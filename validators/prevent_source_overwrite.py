@@ -57,27 +57,40 @@ def is_backup_destination(token):
     return bool(re.search(r'(^|[\\._-])(bak|backup|original|before)([\\._-]|$)', path))
 
 
-def extract_copy_destination(haystack):
-    """Extract the destination path from a copy command.
-    Priority: -Destination/-Dest/-D value > last positional arg.
-    Returns destination token or None (fail closed).
+def extract_copy_destinations(text):
+    """Extract destinations from all copy commands in the text.
+    Each copy command is scoped to its segment (delimited by ; | & newline).
+    Returns a list of destination strings (None for unresolvable destinations).
+    Empty list means no copy commands found.
     """
-    dest_match = re.search(r'-(Destination|Dest|D)\s+(\S+)', haystack, re.IGNORECASE)
-    if dest_match:
-        return dest_match.group(2)
+    if not text:
+        return []
 
-    cmd_match = re.search(r'\b(?:Copy-Item|cpi)\b\s+(.+)', haystack, re.IGNORECASE)
-    if not cmd_match:
-        cmd_match = re.search(r'\b(?:cp|copy)\b\s+(.+)', haystack, re.IGNORECASE)
-    if not cmd_match:
-        return None
+    destinations = []
+    # Find all copy commands, scoped to their segment.
+    # Copy-Item/cpi are tried first (via alternation order) to prevent
+    # 'copy' from matching inside 'Copy-Item'.
+    copy_re = re.compile(
+        r'\b(?:Copy-Item|cpi)\b\s*([^;|&\n]*)'
+        r'|\b(?:cp|copy)\b\s*([^;|&\n]*)',
+        re.IGNORECASE
+    )
+    for m in copy_re.finditer(text):
+        args = m.group(1) if m.group(1) is not None else m.group(2)
+        # Check for -Destination/-Dest/-D within this segment
+        dest_match = re.search(r'-(Destination|Dest|D)\s+(\S+)', args, re.IGNORECASE)
+        if dest_match:
+            destinations.append(dest_match.group(2))
+            continue
+        # Positional args
+        tokens = re.findall(r'\S+', args)
+        positionals = [t for t in tokens if not t.startswith('-')]
+        if len(positionals) >= 2:
+            destinations.append(positionals[-1])
+        else:
+            destinations.append(None)  # fail closed
 
-    tokens = re.findall(r'\S+', cmd_match.group(1))
-    positionals = [t for t in tokens if not t.startswith('-')]
-    if len(positionals) >= 2:
-        return positionals[-1]
-
-    return None
+    return destinations
 
 
 def has_protected_target(text):
@@ -95,26 +108,29 @@ def has_protected_target(text):
     )
 
 
-def extract_command_text(data):
-    """Extract the actual command string from parsed JSON.
-    Looks for 'command', 'input', or nested 'tool_input.command'.
-    Returns the command string, or None if not found.
+def extract_all_command_texts(data):
+    """Extract all command-like strings from parsed JSON.
+    Checks command, tool_input.command, and input (in that order).
+    Returns a list of unique strings. Empty list if none found.
     """
     if not isinstance(data, dict):
-        return None
+        return []
+    results = []
     # Direct 'command' field (Bash tool)
     if 'command' in data and isinstance(data['command'], str):
-        return data['command']
-    # 'input' field (apply_patch, etc.)
-    if 'input' in data and isinstance(data['input'], str):
-        return data['input']
+        results.append(data['command'])
     # Nested tool_input.command
     tool_input = data.get('tool_input')
     if isinstance(tool_input, dict):
         cmd = tool_input.get('command')
-        if isinstance(cmd, str):
-            return cmd
-    return None
+        if isinstance(cmd, str) and cmd not in results:
+            results.append(cmd)
+    # 'input' field (apply_patch, etc.) — lowest priority
+    if 'input' in data and isinstance(data['input'], str):
+        inp = data['input']
+        if inp not in results:
+            results.append(inp)
+    return results
 
 
 def main():
@@ -127,26 +143,25 @@ def main():
 
     texts = [raw]
     json_parsed = False
-    command_text = None
+    command_texts = []
     try:
         data = json.loads(raw)
         json_parsed = True
         collect_texts(data, texts)
-        command_text = extract_command_text(data)
+        command_texts = extract_all_command_texts(data)
     except Exception:
         pass
 
     haystack = '\n'.join(texts)
-    # For copy destination extraction, use only the actual command string.
-    # If JSON parsed successfully but command field not found, use empty string
-    # (fail closed) — never fall back to haystack which includes non-command fields.
+    # For copy destination extraction, use only actual command strings.
+    # If JSON parsed but no command fields found, use empty string (fail closed).
     # Fall back to haystack only if JSON parse itself failed (raw text input).
-    if command_text is not None:
-        copy_source = command_text
+    if command_texts:
+        copy_sources = command_texts
     elif json_parsed:
-        copy_source = ""
+        copy_sources = [""]
     else:
-        copy_source = haystack
+        copy_sources = [haystack]
     reasons = []
 
     delete_paths = set()
@@ -192,8 +207,11 @@ def main():
             )
 
     if copy_shell and not destructive_shell:
-        dest = extract_copy_destination(copy_source)
-        if dest is None or not is_backup_destination(dest):
+        all_dests = []
+        for src in copy_sources:
+            all_dests.extend(extract_copy_destinations(src))
+
+        if not all_dests or any(d is None or not is_backup_destination(d) for d in all_dests):
             if has_protected_target(haystack):
                 reasons.append(
                     "copy command targets a protected file without a backup-named destination."

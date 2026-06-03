@@ -130,6 +130,33 @@ $tests = @(
         ExpectedExitCode = 2
     },
     @{
+        Name = "blocks unsafe copy in tool_input.command when input has fake backup"
+        Payload = @{
+            tool = "Bash"
+            input = "Copy-Item -Destination C:\Users\testuser\Documents\foo_backup.csv"
+            tool_input = @{
+                command = "Copy-Item C:\Users\testuser\Documents\foo.csv -Destination C:\Users\testuser\Documents\bar.csv"
+            }
+        }
+        ExpectedExitCode = 2
+    },
+    @{
+        Name = "blocks copy when fake -Destination precedes real copy command"
+        Payload = @{
+            tool = "Bash"
+            command = "Write-Output `"-Destination C:\Users\testuser\Documents\foo_backup.csv`"; Copy-Item C:\Users\testuser\Documents\foo.csv -Destination C:\Users\testuser\Documents\bar.csv"
+        }
+        ExpectedExitCode = 2
+    },
+    @{
+        Name = "blocks when first copy is safe but second copy is unsafe"
+        Payload = @{
+            tool = "Bash"
+            command = "Copy-Item C:\Users\testuser\Documents\foo.csv -Destination C:\Users\testuser\Documents\foo_backup.csv; Copy-Item C:\Users\testuser\Documents\foo.csv -Destination C:\Users\testuser\Documents\bar.csv"
+        }
+        ExpectedExitCode = 2
+    },
+    @{
         Name = "blocks stderr redirect to file"
         Payload = @{
             tool = "Bash"

@@ -134,6 +134,33 @@ tests = [
         'expected': 2,
     },
     {
+        'name': 'blocks unsafe copy in tool_input.command when input has fake backup',
+        'payload': {
+            'tool': 'Bash',
+            'input': r'Copy-Item -Destination C:\Users\testuser\Documents\foo_backup.csv',
+            'tool_input': {
+                'command': r'Copy-Item C:\Users\testuser\Documents\foo.csv -Destination C:\Users\testuser\Documents\bar.csv'
+            }
+        },
+        'expected': 2,
+    },
+    {
+        'name': 'blocks copy when fake -Destination precedes real copy command',
+        'payload': {
+            'tool': 'Bash',
+            'command': r'Write-Output "-Destination C:\Users\testuser\Documents\foo_backup.csv"; Copy-Item C:\Users\testuser\Documents\foo.csv -Destination C:\Users\testuser\Documents\bar.csv'
+        },
+        'expected': 2,
+    },
+    {
+        'name': 'blocks when first copy is safe but second copy is unsafe',
+        'payload': {
+            'tool': 'Bash',
+            'command': r'Copy-Item C:\Users\testuser\Documents\foo.csv -Destination C:\Users\testuser\Documents\foo_backup.csv; Copy-Item C:\Users\testuser\Documents\foo.csv -Destination C:\Users\testuser\Documents\bar.csv'
+        },
+        'expected': 2,
+    },
+    {
         'name': 'blocks stderr redirect to file',
         'payload': {
             'tool': 'Bash',

@@ -222,6 +222,9 @@ PASS blocks copy-item when source has backup name but destination does not: exit
 PASS allows copy-item with -Destination backup name: exit 0
 PASS allows copy-item with -Dest shorthand backup name: exit 0
 PASS blocks copy when fake backup destination is in non-command field: exit 2
+PASS blocks unsafe copy in tool_input.command when input has fake backup: exit 2
+PASS blocks copy when fake -Destination precedes real copy command: exit 2
+PASS blocks when first copy is safe but second copy is unsafe: exit 2
 PASS blocks stderr redirect to file: exit 2
 PASS allows stderr merge to stdout: exit 0
 ```
