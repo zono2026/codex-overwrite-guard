@@ -101,7 +101,9 @@ Copy-Item hooks.json "$env:USERPROFILE\.codex\hooks.json"
 3. Start a new Codex session and run `/hooks` to confirm `PreToolUse` shows **Active 1**.
    Review and trust the hook if prompted.
 
-### Option B: Python (cross-platform / Codex CLI)
+### Option B: Python (macOS / Linux / Codex CLI)
+
+> **Windows + Codex CLI:** Use Option A (PowerShell) instead. The paths below assume a Unix shell.
 
 1. Create the validators directory and copy the script:
 
@@ -110,7 +112,16 @@ mkdir -p ~/.codex/validators
 cp validators/prevent_source_overwrite.py ~/.codex/validators/
 ```
 
-2. Add the hook to `~/.codex/hooks.json`:
+2. Merge the hook definition into `~/.codex/hooks.json`.
+   If you don't have a `hooks.json` yet, copy the example directly:
+
+```bash
+mkdir -p ~/.codex
+cp codex/hooks.python.example.json ~/.codex/hooks.json
+```
+
+   If you already have a `hooks.json`, add the `PreToolUse` entry manually.
+   See [`codex/hooks.python.example.json`](codex/hooks.python.example.json) or use the block below:
 
 ```json
 {
