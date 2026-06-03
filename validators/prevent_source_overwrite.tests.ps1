@@ -47,6 +47,22 @@ $tests = @(
             command = "Copy-Item -LiteralPath C:\Users\OSKCLT4740\Documents\foo.csv -Destination C:\Users\OSKCLT4740\Documents\foo.csv.bak_before_edit -Force"
         }
         ExpectedExitCode = 0
+    },
+    @{
+        Name = "blocks copy-item overwrite without backup name"
+        Payload = @{
+            tool = "Bash"
+            command = "Copy-Item -LiteralPath C:\Users\OSKCLT4740\Documents\foo.csv -Destination C:\Users\OSKCLT4740\Documents\bar.csv"
+        }
+        ExpectedExitCode = 2
+    },
+    @{
+        Name = "allows copy-item to backup name without force"
+        Payload = @{
+            tool = "Bash"
+            command = "Copy-Item -LiteralPath C:\Users\OSKCLT4740\Documents\foo.csv -Destination C:\Users\OSKCLT4740\Documents\foo_backup.csv"
+        }
+        ExpectedExitCode = 0
     }
 )
 

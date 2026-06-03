@@ -94,7 +94,7 @@ Copy-Item hooks.json "$env:USERPROFILE\.codex\hooks.json"
 ```
 
 3. Start a new Codex session and run `/hooks` to confirm `PreToolUse` shows **Active 1**.
-   No manual Trust step is required — hooks defined in `~/.codex/hooks.json` are trusted automatically.
+   Review and trust the hook if prompted.
 
 ### Option B: Python (cross-platform / Codex CLI)
 

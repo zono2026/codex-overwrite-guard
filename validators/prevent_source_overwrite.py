@@ -101,8 +101,7 @@ def main():
             )
 
     risky_shell = re.search(
-        r'\b(Remove-Item|Move-Item|Set-Content|Out-File|rm|del|erase|mv)\b'
-        r'|\bCopy-Item\b[\s\S]*?\b-Force\b'
+        r'\b(Remove-Item|Move-Item|Set-Content|Out-File|Copy-Item|rm|del|erase|mv)\b'
         r'|(^|[^2])>{1,2}\s*[^&]',
         haystack,
         re.IGNORECASE | re.MULTILINE

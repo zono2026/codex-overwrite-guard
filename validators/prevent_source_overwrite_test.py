@@ -52,6 +52,22 @@ tests = [
         },
         'expected': 0,
     },
+    {
+        'name': 'blocks copy-item overwrite without backup name',
+        'payload': {
+            'tool': 'Bash',
+            'command': r'Copy-Item -LiteralPath C:\Users\testuser\Documents\foo.csv -Destination C:\Users\testuser\Documents\bar.csv'
+        },
+        'expected': 2,
+    },
+    {
+        'name': 'allows copy-item to backup name without force',
+        'payload': {
+            'tool': 'Bash',
+            'command': r'Copy-Item -LiteralPath C:\Users\testuser\Documents\foo.csv -Destination C:\Users\testuser\Documents\foo_backup.csv'
+        },
+        'expected': 0,
+    },
 ]
 
 failed = False

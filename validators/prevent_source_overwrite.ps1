@@ -143,7 +143,7 @@ foreach ($match in $addMatches) {
     }
 }
 
-$riskyShellPattern = "(?i)\b(Remove-Item|Move-Item|Set-Content|Out-File|rm|del|erase|mv)\b|(?i)\bCopy-Item\b[\s\S]*\b-Force\b|(?m)(^|[^2])>{1,2}\s*[^&]"
+$riskyShellPattern = "(?i)\b(Remove-Item|Move-Item|Set-Content|Out-File|Copy-Item|rm|del|erase|mv)\b|(?m)(^|[^2])>{1,2}\s*[^&]"
 $hasRiskyShellOperation = [regex]::IsMatch($haystack, $riskyShellPattern)
 $hasBackupIntent = [regex]::IsMatch($haystack, "(?i)(\.bak\b|backup|before|original)")
 
