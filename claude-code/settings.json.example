@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/validators/prevent_source_overwrite.py",
+            "commandWindows": "python \"%USERPROFILE%\\.claude\\validators\\prevent_source_overwrite.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

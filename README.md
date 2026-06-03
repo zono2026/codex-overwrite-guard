@@ -1,10 +1,33 @@
 # codex-overwrite-guard
 
-A PreToolUse hook for [OpenAI Codex CLI](https://github.com/openai/codex) that blocks AI agents from overwriting or deleting source files without an explicit backup.
+A PreToolUse hook for [OpenAI Codex CLI](https://github.com/openai/codex) and [Claude Code](https://docs.anthropic.com/en/docs/claude-code) that blocks AI agents from overwriting or deleting source files without an explicit backup.
 
 ## Background
 
 An AI agent (Codex) overwrote a production source file without making a backup first. The original file was lost. This hook was built to prevent that from happening again.
+
+## Expected Agent Behavior
+
+When the agent attempts a destructive overwrite, the hook blocks it. A well-behaved agent will self-correct and switch to a safe method.
+
+**Example output:**
+
+```
+Tool execution failed: exit code 2
+  Source overwrite guard blocked this tool call.
+  - apply_patch attempted to replace a file by deleting and re-adding it: report.csv
+  Create a same-folder backup or a clearly named new output file before touching the original.
+
+Agent: "The direct overwrite was blocked by the source-file guard.
+        I'll use an in-place patch instead."
+
+*** Update File: report.csv
+@@ -3,1 +3,1 @@
+-old value
++new value
+```
+
+> This is a representative example. When a real block-and-recovery log is captured, it will replace this section.
 
 ## What it blocks
 
@@ -26,19 +49,22 @@ An AI agent (Codex) overwrote a production source file without making a backup f
 
 ## Requirements
 
-- Windows
-- PowerShell 5.1 or later (built into Windows)
-- [OpenAI Codex CLI](https://github.com/openai/codex) v0.1 or later
+- [OpenAI Codex CLI](https://github.com/openai/codex) and/or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
+- **PowerShell version (Windows):** PowerShell 5.1 or later (built into Windows)
+- **Python version (cross-platform):** Python 3.8 or later
 
 ## Installation
 
-1. Copy the validator script to your Codex config folder:
+### Option A: PowerShell (Windows / Codex CLI)
+
+1. Create the validators directory and copy the script:
 
 ```powershell
-Copy-Item prevent_source_overwrite.ps1 "$env:USERPROFILE\.codex\validators\"
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.codex\validators"
+Copy-Item validators\prevent_source_overwrite.ps1 "$env:USERPROFILE\.codex\validators\"
 ```
 
-2. Merge the hook definition into `~/.codex/hooks.json`.  
+2. Merge the hook definition into `~/.codex/hooks.json`.
    If you don't have a `hooks.json` yet, copy it directly:
 
 ```powershell
@@ -67,20 +93,94 @@ Copy-Item hooks.json "$env:USERPROFILE\.codex\hooks.json"
 }
 ```
 
-3. Start a new Codex session and run `/hooks` to confirm `PreToolUse` shows **Active 1**.  
+3. Start a new Codex session and run `/hooks` to confirm `PreToolUse` shows **Active 1**.
    No manual Trust step is required — hooks defined in `~/.codex/hooks.json` are trusted automatically.
 
+### Option B: Python (cross-platform / Codex CLI)
+
+1. Create the validators directory and copy the script:
+
+```bash
+mkdir -p ~/.codex/validators
+cp validators/prevent_source_overwrite.py ~/.codex/validators/
+```
+
+2. Add the hook to `~/.codex/hooks.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|shell_command|functions\\.shell_command|apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.codex/validators/prevent_source_overwrite.py",
+            "timeout": 10,
+            "statusMessage": "Checking source-file overwrite guard"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Option C: Python (Claude Code)
+
+1. Copy the validator script:
+
+```bash
+# macOS / Linux
+mkdir -p ~/.claude/validators
+cp validators/prevent_source_overwrite.py ~/.claude/validators/
+
+# Windows (PowerShell)
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.claude\validators"
+Copy-Item validators\prevent_source_overwrite.py "$env:USERPROFILE\.claude\validators\"
+```
+
+2. Add the hook to `~/.claude/settings.json`. See [`claude-code/settings.json.example`](claude-code/settings.json.example) for a ready-to-use template.
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/validators/prevent_source_overwrite.py",
+            "commandWindows": "python \"%USERPROFILE%\\.claude\\validators\\prevent_source_overwrite.py\""
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
 ## Running tests
+
+**PowerShell:**
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File validators\prevent_source_overwrite.tests.ps1
 ```
 
-Expected output:
+**Python:**
+
+```bash
+python validators/prevent_source_overwrite_test.py
+```
+
+Expected output (both versions):
 
 ```
 PASS blocks empty hook input: exit 2
-PASS blocks apply_patch delete and add replacement via stdin: exit 2
+PASS blocks apply_patch delete and add replacement: exit 2
 PASS allows apply_patch update: exit 0
 PASS blocks remove item against document: exit 2
 PASS blocks remove item without inspectable target: exit 2
@@ -89,7 +189,7 @@ PASS allows same-folder backup copy: exit 0
 
 ## How it works
 
-Codex calls this script as a PreToolUse hook before every tool execution. The hook receives the tool name and input as JSON on stdin. It:
+The agent platform (Codex or Claude Code) calls this script as a PreToolUse hook before every tool execution. The hook receives the tool name and input as JSON on stdin. It:
 
 1. Parses the JSON and flattens all string values into a single text block
 2. Scans for dangerous `apply_patch` markers (`*** Delete File:`, `*** Move to:`)
@@ -100,9 +200,9 @@ Codex calls this script as a PreToolUse hook before every tool execution. The ho
 
 ## Limitations
 
-- Windows only (PowerShell). A cross-platform Python version is not yet available.
-- The `matcher` field must cover all tool names Codex uses for file I/O. If Codex adds new tool names in a future version, update `hooks.json` accordingly.
-- Hook payload format is based on Codex v0.136.0. If the JSON structure changes in a future version, the script may need updating.
+- The `matcher` field must cover all tool names the agent uses for file I/O. If a new tool name is introduced in a future version, update the hook config accordingly.
+- Hook payload format is based on Codex v0.136.0 and Claude Code as of June 2025. If the JSON structure changes in a future version, the script may need updating.
+- The PowerShell version is Windows only. Use the Python version for macOS and Linux.
 
 ## License
 
